@@ -25,11 +25,20 @@ where
     pub async fn add(&self, key: K, value: V, lifetime_sec: u64) -> Result<&str, &str> {
 
         if self.limit > 0 {
-            if self.base.read().await.len() >= self.limit {
+
+            let read = self.base.read().await;
+
+            if read.len() >= self.limit {
+                self.clear().await;
+            }
+
+            if read.len() >= self.limit {
                 return Err("Limit of memory, len is max")
             }
         }
         self.base.write().await.insert(key, Data::new(value, lifetime_sec));
+        // println!("added");
+        // println!("len {}", self.base.read().await.len());
 
         Ok("Ok")
     }
@@ -73,9 +82,12 @@ where
     /// Also used in automatic mode if interval is greater than 0.
     pub async fn clear(&self) {
         let dead_keys: Vec<K> = self.base.read().await.iter()
-            .filter(|(_k, v)| v.is_alive())
+            .filter(|(_k, v)| !v.is_alive())
             .map(|(k, _v)| k.clone())
             .collect();
+
+
+        // println!("dead {}", dead_keys.len());
 
         if dead_keys.len() < 1 {
             return;
@@ -85,6 +97,10 @@ where
         for i in dead_keys {
             hash.remove(&i);
         }
+    }
+
+    pub fn size(&self) -> usize {
+        std::mem::size_of::<Data<V>>()
     }
     
     pub fn new(interval_sec: u64, limit: usize) -> Self {
