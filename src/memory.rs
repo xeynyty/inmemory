@@ -86,7 +86,6 @@ where
             .map(|(k, _v)| k.clone())
             .collect();
 
-
         // println!("dead {}", dead_keys.len());
 
         if dead_keys.len() < 1 {
@@ -99,7 +98,7 @@ where
         }
     }
 
-    pub fn size(&self) -> usize {
+    pub fn size_of_cell(&self) -> usize {
         std::mem::size_of::<Data<V>>()
     }
     
