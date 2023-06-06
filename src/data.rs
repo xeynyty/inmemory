@@ -1,10 +1,10 @@
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 #[derive(Clone, Debug)]
 pub struct Data<V> {
     base: V,
-    lifetime_sec: u64,
-    created_at: SystemTime
+    /// Time, when it will die
+    iat: u64
 }
 
 impl<V> Data<V>
@@ -14,14 +14,16 @@ where
 
     pub fn new(base: V, lifetime_sec: u64) -> Self {
         Data {
-            base, lifetime_sec,
-            created_at: SystemTime::now()
+            base,
+            iat: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs() + lifetime_sec
         }
     }
 
     pub fn is_alive(&self) -> bool {
-        if self.created_at.elapsed().unwrap().as_secs() > self.lifetime_sec {
-            return false // Dead :(
+        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+
+        if self.iat < now {
+            return false
         }
         true // Alive :)
     }

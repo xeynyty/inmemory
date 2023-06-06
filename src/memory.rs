@@ -23,9 +23,7 @@ where
     /// Writes data to memory by the specified key.
     /// If the memory limit is specified, it will return an error if it is exceeded.
     pub async fn add(&self, key: K, value: V, lifetime_sec: u64) -> Result<&str, &str> {
-
         if self.limit > 0 {
-
             let read = self.base.read().await;
 
             if read.len() >= self.limit {
@@ -37,8 +35,6 @@ where
             }
         }
         self.base.write().await.insert(key, Data::new(value, lifetime_sec));
-        // println!("added");
-        // println!("len {}", self.base.read().await.len());
 
         Ok("Ok")
     }
@@ -86,8 +82,6 @@ where
             .map(|(k, _v)| k.clone())
             .collect();
 
-        // println!("dead {}", dead_keys.len());
-
         if dead_keys.len() < 1 {
             return;
         }
@@ -98,6 +92,7 @@ where
         }
     }
 
+    /// Return size of one data "cell" in bytes
     pub fn size_of_cell(&self) -> usize {
         std::mem::size_of::<Data<V>>()
     }
