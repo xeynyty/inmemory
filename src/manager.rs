@@ -7,7 +7,6 @@ use crate::memory::Memory;
 use crate::data::Data;
 
 pub struct Manager {
-    interval_sec: u64,
     bytes_limit: usize,
 }
 
@@ -16,17 +15,7 @@ impl Manager {
     /// New Manager
     pub fn new() -> Self {
         Manager {
-            interval_sec: 0, // default
             bytes_limit: 0
-        }
-    }
-
-
-    /// Change gc interval
-    pub fn interval(self, interval_sec: u64) -> Self {
-        Self {
-            interval_sec,
-            ..self
         }
     }
 
@@ -39,7 +28,7 @@ impl Manager {
     }
 
     /// Run GC and return Memory
-    pub async fn run<K, V>(&self) -> Memory<K, V>
+    pub async fn run<K, V>(&self, gc_interval: Option<u64>) -> Memory<K, V>
     where
         K: Eq + Hash + Clone + Send + Sync + 'static,
         V: Send + Sync + Clone + Debug + 'static,
@@ -50,34 +39,32 @@ impl Manager {
             x => x / std::mem::size_of::<Data<V>>(),
         };
 
+        let interval = match gc_interval {
+            Some(x) => x,
+            None => 60 * 60
+        };
 
-        return match self.interval_sec {
-            1.. => {
-                let (tx, mut rx) = tokio::sync::mpsc::channel::<K>(100);
-                let service = Memory::new(self.interval_sec, limit, Some(tx));
-                let gc = service.clone();
-                tokio::spawn(async move {
-                    let gc = gc;
+        let (tx, mut rx) = tokio::sync::mpsc::channel::<K>(100);
+        let service = Memory::new(limit, Some(tx));
 
-                    let mut old_clear = SystemTime::now();
+        let s = service.clone();
+        tokio::spawn(async move {
+            let service = s;
 
-                    loop {
-                        if let Some(r_key) = rx.recv().await {
-                            gc.remove(r_key).await;
-                        }
-                        if old_clear.elapsed().unwrap().as_secs() > gc.interval() {
-                            gc.clear().await;
-                            old_clear = SystemTime::now();
-                        }
-                    }
-                });
-                service
+            let mut old_clear = SystemTime::now();
+
+            loop {
+                if let Some(r_key) = rx.recv().await {
+                    service.remove(r_key).await;
+                }
+
+                if old_clear.elapsed().unwrap().as_secs() > interval {
+                    service.clear().await;
+                    old_clear = SystemTime::now();
+                }
             }
-            _ => {
-                let service = Memory::new(self.interval_sec, limit, None);
-                service
-            },
-        }
+        });
+        service
     }
 
 }

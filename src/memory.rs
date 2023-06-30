@@ -8,8 +8,6 @@ use crate::data::Data;
 #[derive(Clone)]
 pub struct Memory<K, V> {
     base: Arc<RwLock<HashMap<K, Data<V>>>>,
-    interval_sec: u64,
-
     // The limit of the number of saved records,
     // calculated from the specified number of bytes in the Manager
     limit: usize,
@@ -74,9 +72,6 @@ where
         None
     }
 
-    pub fn interval(&self) -> u64 {
-        self.interval_sec
-    }
     pub fn limit(&self) -> usize {
         self.limit
     }
@@ -104,10 +99,10 @@ where
         std::mem::size_of::<Data<V>>()
     }
     
-    pub fn new(interval_sec: u64, limit: usize, sender: Option<Sender<K>>) -> Self {
+    pub fn new(limit: usize, sender: Option<Sender<K>>) -> Self {
         Self {
             base: Arc::new(RwLock::new(HashMap::new())),
-            interval_sec, limit, sender
+            limit, sender
         }
     }
 }
