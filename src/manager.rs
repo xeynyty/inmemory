@@ -1,13 +1,14 @@
 use std::fmt::Debug;
 use std::hash::Hash;
-use std::time::Duration;
-use tokio::time::sleep;
+use std::ops::Div;
+use std::time::{Duration, SystemTime};
+use tokio::time::{interval, sleep};
 use crate::memory::Memory;
 use crate::data::Data;
 
 pub struct Manager {
     interval_sec: u64,
-    bytes_limit: usize
+    bytes_limit: usize,
 }
 
 impl Manager {
@@ -40,7 +41,7 @@ impl Manager {
     /// Run GC and return Memory
     pub async fn run<K, V>(&self) -> Memory<K, V>
     where
-        K: Eq + PartialEq + Hash + Clone + Send + Sync + 'static,
+        K: Eq + Hash + Clone + Send + Sync + 'static,
         V: Send + Sync + Clone + Debug + 'static,
     {
 
@@ -49,29 +50,34 @@ impl Manager {
             x => x / std::mem::size_of::<Data<V>>(),
         };
 
-        let service = Memory::new(self.interval_sec, limit);
 
-        let gc = service.clone();
+        return match self.interval_sec {
+            1.. => {
+                let (tx, mut rx) = tokio::sync::mpsc::channel::<K>(100);
+                let service = Memory::new(self.interval_sec, limit, Some(tx));
+                let gc = service.clone();
+                tokio::spawn(async move {
+                    let gc = gc;
 
-        // if gc interval = 0 -> gc off
-        if gc.interval() != 0 {
-            tokio::spawn(async move {
+                    let mut old_clear = SystemTime::now();
 
-                let gc = gc;
-
-                if gc.interval() == 0 {
-                    return;
-                }
-
-                loop {
-                    sleep(Duration::from_secs(gc.interval())).await;
-                    gc.clear().await;
-                }
-
-            });
+                    loop {
+                        if let Some(r_key) = rx.recv().await {
+                            gc.remove(r_key).await;
+                        }
+                        if old_clear.elapsed().unwrap().as_secs() > gc.interval() {
+                            gc.clear().await;
+                            old_clear = SystemTime::now();
+                        }
+                    }
+                });
+                service
+            }
+            _ => {
+                let service = Memory::new(self.interval_sec, limit, None);
+                service
+            },
         }
-
-        service
     }
 
 }

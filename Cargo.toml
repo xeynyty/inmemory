@@ -7,4 +7,3 @@ edition = "2021"
 
 [dependencies]
 tokio = { version = "1.28.1", features = ["full"] }
-bincode = "2.0.0-rc.3"

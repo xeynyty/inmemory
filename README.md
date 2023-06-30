@@ -1,6 +1,6 @@
 Inmemory is a small Redis-like library for storing information in the application itself, without using third-party services. The data is stored in key-value format, as in Redis or HashMap.
 
-Uses Tokio and Bincode libraries
+Uses Tokio library
 
 
     use inmemory::Manager;

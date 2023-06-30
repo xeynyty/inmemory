@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::hash::Hash;
 use std::sync::Arc;
+use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
 use crate::data::Data;
 
@@ -11,7 +12,8 @@ pub struct Memory<K, V> {
 
     // The limit of the number of saved records,
     // calculated from the specified number of bytes in the Manager
-    limit: usize
+    limit: usize,
+    sender: Option<Sender<K>>
 }
 
 impl<K, V> Memory<K, V>
@@ -47,22 +49,27 @@ where
         None
     }
 
-    /// Getting data from memory,
-    /// including "dead" ones, if they have not been cleared yet.
+    /// Getting data from memory
     pub async fn get(&self, key: K) -> Option<V> {
         if let Some(data) = self.base.read().await.get(&key) {
-            return Some(data.unwrap());
+            if data.is_alive() {
+                return Some(data.unwrap());
+            } else {
+                if let Some(x) = &self.sender {
+                    if let Err(e) = x.send(key).await {
+                        eprintln!("{}", e);
+                    }
+                }
+            }
         }
         None
     }
 
     /// If there is stale data in memory (not yet garbage collected)
     /// then it will not be retrieved with this function.
-    pub async fn get_safety(&self, key: K) -> Option<V> {
+    pub async fn get_dead(&self, key: K) -> Option<V> {
         if let Some(data) = self.base.read().await.get(&key) {
-            if data.is_alive() {
-                return Some(data.unwrap());
-            }
+            return Some(data.unwrap());
         }
         None
     }
@@ -97,10 +104,10 @@ where
         std::mem::size_of::<Data<V>>()
     }
     
-    pub fn new(interval_sec: u64, limit: usize) -> Self {
+    pub fn new(interval_sec: u64, limit: usize, sender: Option<Sender<K>>) -> Self {
         Self {
             base: Arc::new(RwLock::new(HashMap::new())),
-            interval_sec, limit
+            interval_sec, limit, sender
         }
     }
 }
