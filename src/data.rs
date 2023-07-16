@@ -1,4 +1,4 @@
-use std::time::{SystemTime, UNIX_EPOCH};
+use crate::utils::unix_epoch_now;
 
 #[derive(Clone, Debug)]
 pub struct Data<V> {
@@ -15,17 +15,24 @@ where
     pub fn new(base: V, lifetime_sec: u64) -> Self {
         Data {
             base,
-            iat: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs() + lifetime_sec
+            iat: unix_epoch_now() + lifetime_sec
         }
     }
 
     pub fn is_alive(&self) -> bool {
-        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+        let now = unix_epoch_now();
 
         if self.iat < now {
             return false
         }
         true // Alive :)
+    }
+
+    pub fn get(&self) -> Option<V> {
+        if self.is_alive() {
+            return Some(self.base.clone())
+        }
+        None
     }
 
     pub fn unwrap(&self) -> V {

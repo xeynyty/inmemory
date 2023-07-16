@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::hash::Hash;
+use std::io::{Error, ErrorKind};
 use std::sync::Arc;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::RwLock;
@@ -22,7 +23,7 @@ where
 
     /// Writes data to memory by the specified key.
     /// If the memory limit is specified, it will return an error if it is exceeded.
-    pub async fn add(&self, key: K, value: V, lifetime_sec: u64) -> Result<&str, &str> {
+    pub async fn add(&self, key: K, value: V, lifetime_sec: u64) -> Result<(), Error> {
         if self.limit > 0 {
             let read = self.base.read().await;
 
@@ -31,12 +32,12 @@ where
             }
 
             if read.len() >= self.limit {
-                return Err("Limit of memory, len is max")
+                return Err(Error::new(ErrorKind::WriteZero, "Limit of memory, len is max"))
             }
         }
         self.base.write().await.insert(key, Data::new(value, lifetime_sec));
 
-        Ok("Ok")
+        Ok(())
     }
 
     /// Clears data from memory and returns it.
@@ -50,13 +51,12 @@ where
     /// Getting data from memory
     pub async fn get(&self, key: K) -> Option<V> {
         if let Some(data) = self.base.read().await.get(&key) {
-            if data.is_alive() {
-                return Some(data.unwrap());
-            } else {
-                if let Some(x) = &self.sender {
-                    if let Err(e) = x.send(key).await {
-                        eprintln!("{}", e);
-                    }
+            if let Some(data) = data.get() {
+                return Some(data)
+            }
+            if let Some(x) = &self.sender {
+                if let Err(e) = x.send(key).await {
+                    eprintln!("GC -> {}", e);
                 }
             }
         }
@@ -66,10 +66,7 @@ where
     /// If there is stale data in memory (not yet garbage collected)
     /// then it will not be retrieved with this function.
     pub async fn get_dead(&self, key: K) -> Option<V> {
-        if let Some(data) = self.base.read().await.get(&key) {
-            return Some(data.unwrap());
-        }
-        None
+       Some(self.base.read().await.get(&key)?.unwrap())
     }
 
     pub fn limit(&self) -> usize {
@@ -89,8 +86,8 @@ where
         }
 
         let mut hash = self.base.write().await;
-        for i in dead_keys {
-            hash.remove(&i);
+        for key in dead_keys {
+            hash.remove(&key);
         }
     }
 
