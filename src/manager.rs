@@ -20,8 +20,7 @@ impl Manager {
     /// Change gc limit
     pub fn limit(self, bytes: usize) -> Self {
         Self {
-            bytes_limit: bytes,
-            ..self
+            bytes_limit: bytes
         }
     }
 
@@ -37,10 +36,7 @@ impl Manager {
             x => x / std::mem::size_of::<Data<V>>(),
         };
 
-        let interval = match gc_interval {
-            Some(x) => x,
-            None => 60 * 60
-        };
+        let interval = gc_interval.unwrap_or(60 * 60);
 
         let (tx, mut rx) = tokio::sync::mpsc::channel::<K>(100);
         let service = Memory::new(limit, Some(tx));
@@ -65,4 +61,10 @@ impl Manager {
         service
     }
 
+}
+
+impl Default for Manager {
+    fn default() -> Self {
+        Manager::new()
+    }
 }

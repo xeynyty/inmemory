@@ -23,7 +23,7 @@ where
 
     /// Writes data to memory by the specified key.
     /// If the memory limit is specified, it will return an error if it is exceeded.
-    pub async fn add(&self, key: K, value: V, lifetime_sec: u64) -> Result<(), Error> {
+    pub async fn add(&self, key: K, value: V, iat: u64) -> Result<(), Error> {
         if self.limit > 0 {
             let read = self.base.read().await;
 
@@ -35,7 +35,7 @@ where
                 return Err(Error::new(ErrorKind::WriteZero, "Limit of memory, len is max"))
             }
         }
-        self.base.write().await.insert(key, Data::new(value, lifetime_sec));
+        self.base.write().await.insert(key, Data::new(value, iat));
 
         Ok(())
     }
@@ -81,7 +81,7 @@ where
             .map(|(k, _v)| k.clone())
             .collect();
 
-        if dead_keys.len() < 1 {
+        if dead_keys.is_empty() {
             return;
         }
 

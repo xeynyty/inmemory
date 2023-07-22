@@ -12,10 +12,9 @@ where
     V: Clone
 {
 
-    pub fn new(base: V, lifetime_sec: u64) -> Self {
+    pub fn new(base: V, iat: u64) -> Self {
         Data {
-            base,
-            iat: unix_epoch_now() + lifetime_sec
+            base, iat
         }
     }
 
