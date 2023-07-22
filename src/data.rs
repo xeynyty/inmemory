@@ -21,7 +21,7 @@ where
     pub fn is_alive(&self) -> bool {
         let now = unix_epoch_now();
 
-        if self.iat < now {
+        if self.iat != 0 && self.iat < now {
             return false
         }
         true // Alive :)
