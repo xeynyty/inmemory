@@ -1,4 +1,4 @@
-mod memory;
+pub mod memory;
 mod data;
 mod manager;
 mod utils;
